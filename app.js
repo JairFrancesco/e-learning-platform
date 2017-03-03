@@ -4,100 +4,71 @@ var favicon = require('serve-favicon');
 var logger = require('morgan');
 var cookieParser = require('cookie-parser');
 var bodyParser = require('body-parser');
-var exphbs = require('express-handlebars');
-var expressValidator = require('express-validator');
-var flash = require('connect-flash');
-var session = require('express-session');
-var passport = require('passport');
-var LocalStrategy = require('passport-local'),Strategy;
-async = require('async');
-
-//----  | Database setup  |  ------- >
-var mongo = require('mongodb');
 var mongoose = require('mongoose');
-mongoose.connect('mongodb://localhost/elearn');
+var passport = require('passport');
+//var LocalStrategy = require('passport-local').Strategy;
+var authenticate = require('./authenticate');
+
+var config = require('./config');
+
+mongoose.connect(config.mongoUrl);
 var db = mongoose.connection;
-//----  | Database setup  |  ------- > 
+db.on('error', console.error.bind(console, 'connection error:'));
+db.once('open', function () {
+    // we're connected!
+    console.log("Connected correctly to server");
+});
 
 var routes = require('./routes/index');
 var users = require('./routes/users');
-var classes = require('./routes/classes');
-var students = require('./routes/students');
-var instructors = require('./routes/instructors');
-var TAs = require('./routes/TAs')
+var dishRouter = require('./routes/dishRouter');
+var promoRouter = require('./routes/promoRouter');
+var leaderRouter = require('./routes/leaderRouter');
+var favoriteRouter = require('./routes/favoriteRouter');
 
 var app = express();
 
 // view engine setup
 app.set('views', path.join(__dirname, 'views'));
-app.engine('handlebars', exphbs({defaultLayout:'layout'}));
-app.set('view engine', 'handlebars');
-
+app.set('view engine', 'jade');
 // uncomment after placing your favicon in /public
 //app.use(favicon(path.join(__dirname, 'public', 'favicon.ico')));
+
 app.use(logger('dev'));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(cookieParser());
+
+//CORS middleware
+var allowCrossDomain = function(req, res, next) {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, x-access-token');
+    next();
+}
+
+app.use(allowCrossDomain);
+
+
+
+// passport config
+//var User = require('./models/user');
+app.use(passport.initialize());
+//passport.use(new LocalStrategy(User.authenticate()));
+//passport.serializeUser(User.serializeUser());
+//passport.deserializeUser(User.deserializeUser());
+
+
+
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Express Session
-app.use(session({
-    secret: 'secret',
-    saveUninitialized: true,
-    resave: true
-}));
-
-// Passport
-app.use(passport.initialize());
-app.use(passport.session());
-
-
-// Express Validator
-app.use(expressValidator({
-  errorFormatter: function(param, msg, value) {
-      var namespace = param.split('.')
-      , root    = namespace.shift()
-      , formParam = root;
-
-    while(namespace.length) {
-      formParam += '[' + namespace.shift() + ']';
-    }
-    return {
-      param : formParam,
-      msg   : msg,
-      value : value
-    };
-  }
-}));
-
-// Connect-Flash
-app.use(flash());
-
-// Makes the user object global in all views
-app.get('*', function(req, res, next) {
-  // put user into res.locals for easy access from templates
-  res.locals.user = req.user || null;
-  if(req.user){
-    res.locals.type = req.user.type;
-  }
-  next();
-});
-
-// Global Vars
-app.use(function (req, res, next) {
-  res.locals.success_msg = req.flash('success_msg');
-  res.locals.error_msg = req.flash('error_msg');
-  res.locals.error = req.flash('error');
-  next();
-});
 
 app.use('/', routes);
 app.use('/users', users);
-app.use('/classes', classes);
-app.use('/students', students);
-app.use('/instructors', instructors);
-app.use('/TAs', TAs)
+app.use('/dishes',dishRouter);
+app.use('/promotions',promoRouter);
+app.use('/leadership',leaderRouter);
+app.use('/favorites', favoriteRouter);
 
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {
@@ -106,20 +77,13 @@ app.use(function(req, res, next) {
   next(err);
 });
 
-/*
- {{    *-^-*    Bottom of app.js   *-^-*    }}
-  ----------------------------------
-  <><><>  <><><>  <><><>
-  ----------------------------------
-  error handling section
-*/
-
+// error handlers
 // development error handler
 // will print stacktrace
 if (app.get('env') === 'development') {
   app.use(function(err, req, res, next) {
     res.status(err.status || 500);
-    res.render('error', {
+    res.json({
       message: err.message,
       error: err
     });
@@ -130,12 +94,20 @@ if (app.get('env') === 'development') {
 // no stacktraces leaked to user
 app.use(function(err, req, res, next) {
   res.status(err.status || 500);
-  res.render('error', {
+  res.json({
     message: err.message,
     error: {}
   });
 });
 
-console.log('App is running @3000')
+// Secure traffic only
+app.all('*', function(req, res, next){
+    console.log('req start: ',req.secure, req.hostname, req.url, app.get('port'));
+  if (req.secure) {
+    return next();
+  };
+
+ res.redirect('https://'+req.hostname+':'+app.get('secPort')+req.url);
+});
 
 module.exports = app;

@@ -1,176 +1,100 @@
 var express = require('express');
 var router = express.Router();
 var passport = require('passport');
-var LocalStrategy = require('passport-local').Strategy;
-
-// Include User Model
 var User = require('../models/user');
-// Include Student Model
-var Student = require('../models/student');
-// Include Instructor Model
-var Instructor = require('../models/instructor');
-// Include Ta Model
-var Ta = require('../models/ta');
+var Verify    = require('./verify');
 
-// User Register
-router.get('/register', function(req, res, next) {
-  res.render('users/register');
+/* GET users listing. */
+router.get('/', Verify.verifyOrdinaryUser ,Verify.verifyAdmin ,function(req, res, next) {
+	User.find({}, function(err, user){
+		if (err) throw err;
+		res.json(user);
+	});
+  //res.send('respond with a resource');
 });
 
-// Register User
-router.post('/register', function(req, res, next) {
- 	// Get Form Values
-	var first_name     	= req.body.first_name;
-	var last_name     	= req.body.last_name;
-	var street_address  = req.body.street_address;
-	var city     		    = req.body.city;
-	var state    		    = req.body.state;
-	var zip     		    = req.body.zip;
-	var email    		    = req.body.email;
-	var username 		    = req.body.username;
-	var password 		    = req.body.password;
-	var password2       = req.body.password2;
-	var type            = req.body.type;
+router.post('/register', function(req, res) {
+    User.register(new User({ username : req.body.username }),
+        req.body.password, function(err, user) {
+        if (err) {
+            return res.status(500).json({err: err});
+        }
+        if(req.body.firstname) {
+            user.firstname = req.body.firstname;
+        }
+        if(req.body.lastname) {
+            user.lastname = req.body.lastname;
+        }
+        user.save(function(err,user) {
+            passport.authenticate('local')(req, res, function () {
+                return res.status(200).json({status: 'Registration Successful!'});
+            });
+        });
+    });
+});
 
-	// Form Validation
-	req.checkBody('first_name', 'First name field is required').notEmpty();
-	req.checkBody('last_name', 'Last name field is required').notEmpty();
-	req.checkBody('email', 'Email field is required').notEmpty();
-	req.checkBody('email', 'Email must be a valid email address').isEmail();
-	req.checkBody('username', 'Username field is required').notEmpty();
-	req.checkBody('password', 'Password field is required').notEmpty();
-	req.checkBody('password2', 'Passwords do not match').equals(req.body.password);
-
-	errors = req.validationErrors();
-
-	if(errors){
-		res.render('users/register', {
-			errors: errors
-		});
-	} else {
-		var newUser = new User({
-			email: email,
-			username:username,
-			password: password,
-			type: type
-		});
-
-		if(type == 'student'){
-			console.log('Registering Student...');
-//  --------------( creating Student ) -----
-			var newStudent = new Student({
-				first_name: first_name,
-				last_name: last_name,
-				address: [{
-					street_address: street_address,
-					city: city,
-					state: state,
-					zip: zip
-				}],
-				email: email,
-				username: username
-			});
-
-			User.saveStudent(newUser, newStudent, function(err, user){
-				console.log('Student created');
-			});
-//  --------------( creating Student ) -----
-		} else if(type == 'instructor'){
-			console.log('Registering Instructor...');
-//  --------------( creating Instructor ) -----
-			var newInstructor = new Instructor({
-				first_name: first_name,
-				last_name: last_name,
-				address: [{
-					street_address: street_address,
-					city: city,
-					state: state,
-					zip: zip
-				}],
-				email: email,
-				username:username
-			});
-
-			User.saveInstructor(newUser, newInstructor, function(err, user){
-				console.log('Instructor created');
-			});
-//  --------------( creating Instructor ) -----
-		}else {
-      console.log('Registering Teacher Assistant')
-//  --------------( creating Teacher assistant ) -----
-      var newTa = new Ta({
-				first_name: first_name,
-				last_name: last_name,
-				email: email,
-				username:username
-      });
-
-      User.saveTa(newUser, newTa, function(err, user) {
-        console.log('Ta created')
-      })
-//  --------------( creating Teacher assistant ) -----
+router.post('/login', function(req, res, next) {
+  passport.authenticate('local', function(err, user, info) {
+    if (err) {
+      return next(err);
     }
-
-		req.flash('success_msg', 'User Added');
-		res.redirect('/');
-	}
+    if (!user) {
+      return res.status(401).json({
+        err: info
+      });
+    }
+    req.logIn(user, function(err) {
+      if (err) {
+        return res.status(500).json({
+          err: 'Could not log in user'
+        });
+      }
+        
+      //var token = Verify.getToken(user);
+      var token = Verify.getToken({"username":user.username, "_id":user._id, "admin":user.admin});
+      res.status(200).json({
+        status: 'Login successful!',
+        success: true,
+        token: token
+      });
+    });
+  })(req,res,next);
 });
 
-
-//  ----------- (  Password section ) ----------------->
-passport.serializeUser(function(user, done) {
-  done(null, user._id);
-});
-
-
-passport.deserializeUser(function(id, done) {
-  User.getUserById(id, function (err, user) {
-    done(err, user);
+router.get('/logout', function(req, res) {
+  req.logout();
+  res.status(200).json({
+    status: 'Bye!'
   });
 });
 
-router.post('/login', passport.authenticate('local',{failureRedirect:'/', failureFlash: true}), function(req, res, next) {
-  	req.flash('success_msg','You are now logged in');
-  	var usertype = req.user.type;
-  	res.redirect('/'+usertype+'s/classes');
-});
+router.get('/facebook', passport.authenticate('facebook'),
+  function(req, res){});
 
-passport.use(new LocalStrategy(
-  function(username, password, done) {
-  	User.getUserByUsername(username, function(err, user){
-    	if (err) throw err;
-    	if(!user){
-    		return done(null, false, { message: 'Unknown user ' + username });
-    	}
-
-    	User.comparePassword(password, user.password, function(err, isMatch) {
-      		if (err) return done(err);
-      		if(isMatch) {
-        		return done(null, user);
-      		} else {
-      			console.log('Invalid Password');
-      			// Success Message
-        		return done(null, false, { message: 'Invalid password' });
-      		}
-   	 	});
+router.get('/facebook/callback', function(req,res,next){
+  passport.authenticate('facebook', function(err, user, info) {
+    if (err) {
+      return next(err);
+    }
+    if (!user) {
+      return res.status(401).json({
+        err: info
+      });
+    }
+    req.logIn(user, function(err) {
+      if (err) {
+        return res.status(500).json({
+          err: 'Could not log in user'
+        });
+      }
+              var token = Verify.getToken(user);
+              res.status(200).json({
+        status: 'Login successful!',
+        success: true,
+        token: token
+      });
     });
-  }
-));
-//  ----------- (  ending Password section ) ----------------->
-
-// Log User Out
-router.get('/logout', function(req, res){
-	req.logout();
- 	// Success Message
-	req.flash('success_msg', "You have logged out");
-  	res.redirect('/');
+  })(req,res,next);
 });
-
 
 module.exports = router;
-
-/* ( note to self)
---  hunting bugs  --
-so currently i'm working to fix this if elseif else statement
-
-*/
