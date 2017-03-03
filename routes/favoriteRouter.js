@@ -3,7 +3,7 @@ var bodyParser = require('body-parser');
 var mongoose = require('mongoose');
 
 var Favorite = require('../models/favorites');
-var Dish = require('../models/dishes');
+var Dish = require('../models/courses');
 var verify = require('./verify');
 
 var favoriteRouter = express.Router();
@@ -14,7 +14,7 @@ favoriteRouter.route('/')
     .get(function (req, res, next) {
         Favorite.find({'postedBy': req.decoded._id})
             .populate('postedBy')
-            .populate('dishes')
+            .populate('courses')
             .exec(function (err, favorites) {
                 if (err) return err;
                 res.json(favorites);
@@ -29,14 +29,14 @@ favoriteRouter.route('/')
 
                 if (favorites.length) {
                     var favoriteAlreadyExist = false;
-                    if (favorites[0].dishes.length) {
-                        for (var i = (favorites[0].dishes.length - 1); i >= 0; i--) {
-                            favoriteAlreadyExist = favorites[0].dishes[i] == req.body._id;
+                    if (favorites[0].courses.length) {
+                        for (var i = (favorites[0].courses.length - 1); i >= 0; i--) {
+                            favoriteAlreadyExist = favorites[0].courses[i] == req.body._id;
                             if (favoriteAlreadyExist) break;
                         }
                     }
                     if (!favoriteAlreadyExist) {
-                        favorites[0].dishes.push(req.body._id);
+                        favorites[0].courses.push(req.body._id);
                         favorites[0].save(function (err, favorite) {
                             if (err) throw err;
                             console.log('Um somethings up!');
@@ -50,7 +50,7 @@ favoriteRouter.route('/')
                 } else {
                     Favorite.create({postedBy: req.body.postedBy}, function (err, favorite) {
                         if (err) throw err;
-                        favorite.dishes.push(req.body._id);
+                        favorite.courses.push(req.body._id);
                         favorite.save(function (err, favorite) {
                             if (err) throw err;
                             console.log('Something is up!');
@@ -69,7 +69,7 @@ favoriteRouter.route('/')
         })
     });
 
-favoriteRouter.route('/:dishId')
+favoriteRouter.route('/:courseId')
     .all(verify.verifyOrdinaryUser)
     .delete(function (req, res, next) {
 
@@ -78,9 +78,9 @@ favoriteRouter.route('/:dishId')
             var favorite = favorites ? favorites[0] : null;
 
             if (favorite) {
-                for (var i = (favorite.dishes.length - 1); i >= 0; i--) {
-                    if (favorite.dishes[i] == req.params.dishId) {
-                        favorite.dishes.remove(req.params.dishId);
+                for (var i = (favorite.courses.length - 1); i >= 0; i--) {
+                    if (favorite.courses[i] == req.params.courseId) {
+                        favorite.courses.remove(req.params.courseId);
                     }
                 }
                 favorite.save(function (err, favorite) {

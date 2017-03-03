@@ -22,7 +22,7 @@ var User = new Schema({
       required: false
     },
     country: {
-      type: String
+      type: String,
       required: false
       //type: Schema.Types.ObjectId,
       //ref: 'Country'

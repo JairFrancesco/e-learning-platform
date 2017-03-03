@@ -2,32 +2,32 @@ var express = require('express');
 var bodyParser = require('body-parser');
 var mongoose = require('mongoose');
 
-var Dishes = require('../models/dishes');
+var Dishes = require('../models/courses');
 var Verify = require('./verify');
 
-var dishRouter = express.Router();
-dishRouter.use(bodyParser.json());
+var courseRouter = express.Router();
+courseRouter.use(bodyParser.json());
 
-dishRouter.route('/')
+courseRouter.route('/')
 .get(function (req, res, next) {
     Dishes.find(req.query)
         .populate('comments.postedBy')
-        .exec(function (err, dish) {
+        .exec(function (err, course) {
         if (err) next(err);
-        res.json(dish);
+        res.json(course);
     });
 })
 
 .post(Verify.verifyOrdinaryUser, Verify.verifyAdmin, function (req, res, next) {
-    Dishes.create(req.body, function (err, dish) {
+    Dishes.create(req.body, function (err, course) {
         if (err) next(err);
         console.log('Dish created!');
-        var id = dish._id;
+        var id = course._id;
         res.writeHead(200, {
             'Content-Type': 'text/plain'
         });
 
-        res.end('Added the dish with id: ' + id);
+        res.end('Added the course with id: ' + id);
     });
 })
 
@@ -38,64 +38,64 @@ dishRouter.route('/')
     });
 });
 
-dishRouter.route('/:dishId')
+courseRouter.route('/:courseId')
 .get(function (req, res, next) {
-    Dishes.findById(req.params.dishId)
+    Dishes.findById(req.params.courseId)
         .populate('comments.postedBy')
-        .exec(function (err, dish) {
+        .exec(function (err, course) {
         if (err) next(err);
-        res.json(dish);
+        res.json(course);
     });
 })
 
 .put(Verify.verifyOrdinaryUser, Verify.verifyAdmin, function (req, res, next) {
-    Dishes.findByIdAndUpdate(req.params.dishId, {
+    Dishes.findByIdAndUpdate(req.params.courseId, {
         $set: req.body
     }, {
         new: true
-    }, function (err, dish) {
+    }, function (err, course) {
         if (err) next(err);
-        res.json(dish);
+        res.json(course);
     });
 })
 
 .delete(Verify.verifyOrdinaryUser, Verify.verifyAdmin, function (req, res, next) {
-        Dishes.findByIdAndRemove(req.params.dishId, function (err, resp) {
+        Dishes.findByIdAndRemove(req.params.courseId, function (err, resp) {
         if (err) next(err);
         res.json(resp);
     });
 });
 
-dishRouter.route('/:dishId/comments')
+courseRouter.route('/:courseId/comments')
 .get(function (req, res, next) {
-    Dishes.findById(req.params.dishId)
+    Dishes.findById(req.params.courseId)
         .populate('comments.postedBy')
-        .exec(function (err, dish) {
+        .exec(function (err, course) {
         if (err) next(err);
-        res.json(dish.comments);
+        res.json(course.comments);
     });
 })
 
 .post(Verify.verifyOrdinaryUser ,function (req, res, next) {
-    Dishes.findById(req.params.dishId, function (err, dish) {
+    Dishes.findById(req.params.courseId, function (err, course) {
         if (err) next(err);
         req.body.postedBy = req.decoded._id;
-        dish.comments.push(req.body);
-        dish.save(function (err, dish) {
+        course.comments.push(req.body);
+        course.save(function (err, course) {
             if (err) next(err);
             console.log('Updated Comments!');
-            res.json(dish);
+            res.json(course);
         });
     });
 })
 
 .delete(Verify.verifyOrdinaryUser,Verify.verifyAdmin, function (req, res, next) {
-    Dishes.findById(req.params.dishId, function (err, dish) {
+    Dishes.findById(req.params.courseId, function (err, course) {
         if (err) next(err);
-        for (var i = (dish.comments.length - 1); i >= 0; i--) {
-            dish.comments.id(dish.comments[i]._id).remove();
+        for (var i = (course.comments.length - 1); i >= 0; i--) {
+            course.comments.id(course.comments[i]._id).remove();
         }
-        dish.save(function (err, result) {
+        course.save(function (err, result) {
             if (err) next(err);
             res.writeHead(200, {
                 'Content-Type': 'text/plain'
@@ -105,46 +105,46 @@ dishRouter.route('/:dishId/comments')
     });
 });
 
-dishRouter.route('/:dishId/comments/:commentId')
+courseRouter.route('/:courseId/comments/:commentId')
 .get(Verify.verifyOrdinaryUser,function (req, res, next) {
-    Dishes.findById(req.params.dishId)
+    Dishes.findById(req.params.courseId)
         .populate('comments.postedBy')
-        .exec(function (err, dish) {
+        .exec(function (err, course) {
         if (err) next(err);
-        res.json(dish.comments.id(req.params.commentId));
+        res.json(course.comments.id(req.params.commentId));
     });
 })
 
 .put(Verify.verifyOrdinaryUser,function (req, res, next) {
     // We delete the existing commment and insert the updated
     // comment as a new comment
-    Dishes.findById(req.params.dishId, function (err, dish) {
+    Dishes.findById(req.params.courseId, function (err, course) {
         if (err) next(err);
-        dish.comments.id(req.params.commentId).remove();
+        course.comments.id(req.params.commentId).remove();
                 req.body.postedBy = req.decoded._id;
-        dish.comments.push(req.body);
-        dish.save(function (err, dish) {
+        course.comments.push(req.body);
+        course.save(function (err, course) {
             if (err) next(err);
             console.log('Updated Comments!');
-            res.json(dish);
+            res.json(course);
         });
     });
 })
 
 .delete(Verify.verifyOrdinaryUser,Verify.verifyAdmin,function (req, res, next) {
-    Dishes.findById(req.params.dishId, function (err, dish) {
-        if (dish.comments.id(req.params.commentId).postedBy
+    Dishes.findById(req.params.courseId, function (err, course) {
+        if (course.comments.id(req.params.commentId).postedBy
            != req.decoded._id) {
             var err = new Error('You are not authorized to perform this operation!');
             err.status = 403;
             return next(err);
         }
-        dish.comments.id(req.params.commentId).remove();
-        dish.save(function (err, resp) {
+        course.comments.id(req.params.commentId).remove();
+        course.save(function (err, resp) {
             if (err) next(err);
             res.json(resp);
         });
     });
 });
 
-module.exports = dishRouter;
+module.exports = courseRouter;
