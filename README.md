@@ -1,6 +1,6 @@
 A demo is working on http://52.39.62.250:9000/
 
-[demo](https://github.com/JairFrancesco/e-learning-platform/blob/master/demo?raw=true)
+![demo](https://github.com/JairFrancesco/e-learning-platform/blob/master/demo.png?raw=true)
 
 From the command line navigate to this folder and run:
 1. npm install
